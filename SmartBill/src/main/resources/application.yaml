@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: SmartBill
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/bcs_billing_db
+      auto-index-creation: true
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# App custom properties
+app:
+  jwt:
+    secret: jdklfnsdfofjfhuhoflks6f1fsgf47ds5ff4f5df4g1g1h5vrt5rwt7t1cvw7tr78r0tw787gdfs2
+    expiration-ms: 86400000       # 24 hours
+    refresh-expiration-ms: 604800000  # 7 days
+
+  otp:
+    expiry-minutes: 10
+    length: 6
+
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:your-google-client-id.apps.googleusercontent.com}
+
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+      - http://localhost:5173
+
+logging:
+  level:
+    com.bcs.billing: DEBUG
+    org.springframework.security: INFO
