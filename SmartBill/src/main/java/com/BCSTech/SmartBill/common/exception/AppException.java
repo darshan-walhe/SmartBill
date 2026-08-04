@@ -22,6 +22,10 @@ public class AppException extends RuntimeException {
         return new AppException(message, HttpStatus.UNAUTHORIZED);
     }
 
+    public static AppException forbidden(String message) {
+        return new AppException(message, HttpStatus.FORBIDDEN);
+    }
+
     public static AppException notFound(String message) {
         return new AppException(message, HttpStatus.NOT_FOUND);
     }

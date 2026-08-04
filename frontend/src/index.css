@@ -1,13 +1,124 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap");
+
+@theme {
+  /* ── Color tokens — copied 1:1 from smartbill_design_system/DESIGN.md ── */
+  --color-surface: #fcf8ff;
+  --color-surface-dim: #dcd8e5;
+  --color-surface-bright: #fcf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f2ff;
+  --color-surface-container: #f0ecf9;
+  --color-surface-container-high: #eae6f4;
+  --color-surface-container-highest: #e4e1ee;
+  --color-on-surface: #1b1b24;
+  --color-on-surface-variant: #464555;
+  --color-inverse-surface: #302f39;
+  --color-inverse-on-surface: #f3effc;
+  --color-outline: #777587;
+  --color-outline-variant: #c7c4d8;
+  --color-surface-tint: #4d44e3;
+  --color-primary: #3525cd;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #4f46e5;
+  --color-on-primary-container: #dad7ff;
+  --color-inverse-primary: #c3c0ff;
+  --color-secondary: #006c49;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #6cf8bb;
+  --color-on-secondary-container: #00714d;
+  --color-tertiary: #684000;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #885500;
+  --color-on-tertiary-container: #ffd4a4;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-background: #f8fafc; /* actual body bg used across every mockup — overrides the
+                                   purple-tinted DESIGN.md token, matching the real HTML */
+  --color-on-background: #1b1b24;
+  --color-surface-variant: #e4e1ee;
+
+  /* ── Backward-compat aliases ──────────────────────────────────────────
+     Old token names from the pre-Stitch theme, mapped onto their nearest
+     M3 equivalent. Keeps pages not yet reskinned against a Stitch mockup
+     (Table, Modal, Toast, ConfirmDialog, the auth screens, Company/Team/
+     Admin pages) visually coherent in the meantime. Remove each alias as
+     its last usage gets migrated to the real token name. */
+  --color-ink: var(--color-on-surface);
+  --color-ink-light: var(--color-on-surface-variant);
+  --color-paper: var(--color-background);
+  --color-border: var(--color-outline-variant);
+  --color-slate: var(--color-on-surface-variant);
+  --color-slate-light: var(--color-outline);
+  --color-danger: var(--color-error);
+  --color-success-soft: #d1fae5;
+  --color-danger-soft: var(--color-error-container);
+  --color-success: var(--color-secondary); /* secondary role is already a green hue here */
+  --color-warning: #b3690a;
+  --color-warning-soft: #fef3e0;
+  --color-primary-soft: var(--color-primary-container);
+  --color-primary-dark: #3323cc; /* DESIGN.md's on-primary-fixed-variant — a darker primary tone */
+
+  /* ── Text-size tokens — copied 1:1 from DESIGN.md's typography scale ── */
+  --text-headline-lg: 30px;
+  --text-headline-lg--line-height: 38px;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--letter-spacing: -0.02em;
+  --text-headline-lg-mobile--font-weight: 600;
+
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 600;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--letter-spacing: 0.01em;
+  --text-label-md--font-weight: 500;
+
+  --text-numeric-table: 14px;
+  --text-numeric-table--line-height: 20px;
+  --text-numeric-table--font-weight: 500;
+
+  /* ── Font tokens ── */
+  --font-sans: "Inter", system-ui, sans-serif;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary-container/20 text-on-surface;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+}
+
+@layer utilities {
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
 }

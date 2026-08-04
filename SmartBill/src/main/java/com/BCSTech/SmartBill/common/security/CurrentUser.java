@@ -17,6 +17,9 @@ import java.lang.annotation.*;
  *   public ResponseEntity<?> myEndpoint(@CurrentUser AuthUser user) {
  *       user.getUserId()    // logged-in user's id
  *       user.getCompanyId() // their company id
+ *       user.getRole()      // their role, e.g. "ADMIN" — read fresh from
+ *                            // the authenticated principal every request,
+ *                            // same as what @PreAuthorize checks against
  *   }
  */
 @Target(ElementType.PARAMETER)
@@ -28,6 +31,7 @@ public @interface CurrentUser {
     class AuthUser {
         private final String userId;
         private final String companyId;
+        private final String role;
     }
 
     @Component
@@ -46,11 +50,12 @@ public @interface CurrentUser {
                                         WebDataBinderFactory binderFactory) {
 
             HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
-            if (request == null) return new AuthUser(null, null);
+            if (request == null) return new AuthUser(null, null, null);
 
             String userId    = (String) request.getAttribute("userId");
             String companyId = (String) request.getAttribute("companyId");
-            return new AuthUser(userId, companyId);
+            String role      = (String) request.getAttribute("role");
+            return new AuthUser(userId, companyId, role);
         }
     }
 }

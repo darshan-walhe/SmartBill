@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -35,6 +36,10 @@ public class User {
     @Indexed(unique = true, sparse = true)
     private String mobile;
 
+    // Excluded from toString() — @Data auto-generates toString() over every
+    // field by default, which would otherwise print the bcrypt hash into any
+    // log line or exception message that happens to include a User object.
+    @ToString.Exclude
     private String passwordHash;
 
     @Builder.Default

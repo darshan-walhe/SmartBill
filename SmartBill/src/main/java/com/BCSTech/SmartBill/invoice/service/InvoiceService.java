@@ -1,9 +1,13 @@
 package com.BCSTech.SmartBill.invoice.service;
 
 import com.BCSTech.SmartBill.accounts.service.AccountsService;
+import com.BCSTech.SmartBill.audit.model.AuditLog.Action;
+import com.BCSTech.SmartBill.audit.service.AuditService;
 import com.BCSTech.SmartBill.common.exception.AppException;
 import com.BCSTech.SmartBill.company.model.Company;
 import com.BCSTech.SmartBill.company.repository.CompanyRepository;
+import com.BCSTech.SmartBill.notification.model.NotificationType;
+import com.BCSTech.SmartBill.notification.service.NotificationService;
 import com.BCSTech.SmartBill.customer.model.Customer;
 import com.BCSTech.SmartBill.customer.service.CustomerService;
 import com.BCSTech.SmartBill.inventory.service.InventoryService;
@@ -16,6 +20,7 @@ import com.BCSTech.SmartBill.invoice.model.Payment;
 import com.BCSTech.SmartBill.invoice.repository.InvoiceRepository;
 import com.BCSTech.SmartBill.product.model.Product;
 import com.BCSTech.SmartBill.product.service.ProductService;
+import com.BCSTech.SmartBill.user.model.Role;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -24,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,12 +47,14 @@ public class InvoiceService {
     private final InvoiceNumberGenerator numberGenerator;
     private final CompanyRepository companyRepository;
     private final AccountsService accountsService;
+    private final NotificationService notificationService;
+    private final AuditService auditService;
 
     // ══════════════════════════════════════════════════════════════
     //  CREATE INVOICE
     // ══════════════════════════════════════════════════════════════
 
-    public InvoiceResponse create(String companyId, String userId, SaveRequest request) {
+    public InvoiceResponse create(String companyId, String userId, String role, SaveRequest request) {
 
         // 1. Validate and fetch customer
         Customer customer = customerService.getCustomerOrThrow(request.getCustomerId(), companyId);
@@ -66,7 +74,7 @@ public class InvoiceService {
                 ? request.getExchangeRate() : BigDecimal.ONE;
 
         List<InvoiceItem> items = buildLineItems(
-                request.getItems(), companyId, isInterState);
+                request.getItems(), companyId, isInterState, role);
 
         // 5. Compute invoice totals
         BigDecimal subtotal      = items.stream().map(i ->
@@ -257,6 +265,12 @@ public class InvoiceService {
         // Post accounting entry: Dr Cash/Bank / Cr Accounts Receivable
         accountsService.postPaymentReceivedEntry(companyId, userId, invoice, payment);
 
+        notificationService.notifyCompany(companyId, NotificationType.PAYMENT_RECEIVED,
+                "Payment received — " + invoice.getInvoiceNumber(),
+                "₹" + request.getAmount() + " received from " + invoice.getCustomerName()
+                        + " against " + invoice.getInvoiceNumber() + ".",
+                "INVOICE", invoice.getId());
+
         log.info("Payment recorded: {} for invoice: {} method: {}",
                 request.getAmount(), invoice.getInvoiceNumber(), request.getPaymentMethod());
 
@@ -281,10 +295,21 @@ public class InvoiceService {
         if (invoice.getPaymentStatus() != PaymentStatus.DRAFT) {
             reverseStock(invoice.getItems(), companyId, userId,
                     invoice.getId(), invoice.getInvoiceNumber());
-            // Reverse customer balance
+
+            // Reverse customer balance — only the OUTSTANDING (unpaid) portion.
+            // Any partial payment already reduced the customer's balance when
+            // it was recorded (see recordPayment()), so reversing the full
+            // invoice total here would double-subtract that payment and leave
+            // the customer's balance incorrectly negative. Reversing just the
+            // unpaid remainder brings it back to exactly zero either way.
+            BigDecimal paidSoFarInr = invoice.getPayments().stream()
+                    .map(Payment::getAmountInr)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal outstandingInr = invoice.getTotalAmountInr().subtract(paidSoFarInr);
+
             customerService.updateBalance(
                     invoice.getCustomerId(), companyId,
-                    invoice.getTotalAmountInr().negate());
+                    outstandingInr.negate());
 
             // Reverse every journal entry posted against this invoice
             // (the sale entry, plus any payment-received entries)
@@ -295,6 +320,15 @@ public class InvoiceService {
 
         invoice.setPaymentStatus(PaymentStatus.CANCELLED);
         invoice = invoiceRepository.save(invoice);
+
+        notificationService.notifyCompany(companyId, NotificationType.INVOICE_CANCELLED,
+                "Invoice cancelled — " + invoice.getInvoiceNumber(),
+                "Invoice " + invoice.getInvoiceNumber() + " for " + invoice.getCustomerName()
+                        + " was cancelled.",
+                "INVOICE", invoice.getId());
+
+        auditService.record(companyId, userId, Action.CANCEL, "INVOICE", invoice.getId(),
+                "Cancelled invoice " + invoice.getInvoiceNumber());
 
         log.info("Invoice cancelled: {}", invoice.getInvoiceNumber());
         return toResponse(invoice);
@@ -372,16 +406,25 @@ public class InvoiceService {
     // ══════════════════════════════════════════════════════════════
 
     private List<InvoiceItem> buildLineItems(List<InvoiceDTOs.ItemRequest> itemRequests,
-                                             String companyId, boolean isInterState) {
+                                             String companyId, boolean isInterState, String role) {
+        // Only ADMIN/MANAGER may override a product's price or apply a
+        // discount on an invoice. STAFF can create invoices, but always at
+        // the product's real sale price — otherwise any STAFF-level account
+        // (the lowest-privilege role that can create invoices at all) could
+        // submit unitPrice: 0.01 for an expensive product and the system
+        // would record that fabricated amount as real revenue while real
+        // stock still leaves inventory. Client-supplied overrides outside
+        // this rule are silently ignored, not merely bounds-checked.
+        boolean canOverridePrice = Role.ADMIN.name().equals(role) || Role.MANAGER.name().equals(role);
+
         List<InvoiceItem> items = new ArrayList<>();
         for (InvoiceDTOs.ItemRequest req : itemRequests) {
             Product product = productService.getProductOrThrow(req.getProductId(), companyId);
 
-            // Use provided price or default sale price
-            BigDecimal unitPrice = req.getUnitPrice() != null
+            BigDecimal unitPrice = (canOverridePrice && req.getUnitPrice() != null)
                     ? req.getUnitPrice() : product.getSalePrice();
 
-            BigDecimal discountPct = req.getDiscountPercent() != null
+            BigDecimal discountPct = (canOverridePrice && req.getDiscountPercent() != null)
                     ? req.getDiscountPercent() : BigDecimal.ZERO;
 
             InvoiceItem item = GstCalculator.calculate(

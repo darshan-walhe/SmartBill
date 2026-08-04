@@ -28,9 +28,14 @@ public class CompanyController {
     }
 
     // PUT /api/company
-    // Only ADMIN or SUPER_ADMIN can update company profile
+    // Only ADMIN can update their own company's profile. SUPER_ADMIN is
+    // deliberately excluded here: a real SUPER_ADMIN has no companyId (they
+    // aren't scoped to any single tenant), so authUser.getCompanyId() is
+    // always null for them and this endpoint would just 404. Platform-level
+    // company management (deactivate/reactivate/subscription plan) lives at
+    // PATCH /api/admin/companies/{id}/... in AdminController instead.
     @PutMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CompanyResponse>> updateCompany(
             @Valid @RequestBody UpdateRequest request,
             @CurrentUser CurrentUser.AuthUser authUser) {

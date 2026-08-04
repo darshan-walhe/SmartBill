@@ -56,6 +56,10 @@ public class Company {
     @Builder.Default
     private int invoiceSequence = 1;
 
+    // Starting purchase number — incremented on each purchase creation
+    @Builder.Default
+    private int purchaseSequence = 1;
+
     // Financial year start month (4 = April for Indian FY)
     @Builder.Default
     private int financialYearStartMonth = 4;

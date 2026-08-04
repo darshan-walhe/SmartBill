@@ -5,6 +5,7 @@ import com.BCSTech.SmartBill.user.model.OtpToken;
 import com.BCSTech.SmartBill.user.repository.OtpTokenRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -16,6 +17,9 @@ import java.time.LocalDateTime;
 public class OtpService {
 
     private final OtpTokenRepository otpTokenRepository;
+
+    @Value("${app.otp.log-plaintext:false}")
+    private boolean logPlaintextOtp;
 
     private static final int OTP_LENGTH = 6;
     private static final int OTP_EXPIRY_MINUTES = 10;
@@ -40,8 +44,15 @@ public class OtpService {
         otpTokenRepository.save(token);
 
         // In production: send via SMS (Twilio / MSG91)
-        // For now we log it — replace with SMS service call
-        log.info("OTP for {}: {}", mobile, otp);
+        // For now we log it — but only the full code when explicitly enabled
+        // for local dev. Otherwise, log a masked version — anyone with read
+        // access to application logs must not be able to log in as any user.
+        if (logPlaintextOtp) {
+            log.info("OTP for {}: {} (DEV MODE — disable app.otp.log-plaintext outside local dev)",
+                    mobile, otp);
+        } else {
+            log.info("OTP generated for {} ({}****)", mobile, otp.substring(0, 2));
+        }
 
         return otp;
     }

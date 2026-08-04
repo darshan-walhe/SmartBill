@@ -27,10 +27,16 @@ public class InvoiceDTOs {
         @Min(value = 1, message = "Quantity must be at least 1")
         private Integer quantity;
 
-        // Override sale price if needed (e.g. negotiated price)
+        // Override sale price if needed (e.g. negotiated price) — only
+        // ADMIN/MANAGER can actually use this override; see InvoiceService.
+        // buildLineItems(). STAFF-submitted values here are ignored, but we
+        // still bound them so nothing absurd is even accepted at the door.
+        @DecimalMin(value = "0.01", message = "Unit price must be greater than 0")
         private BigDecimal unitPrice;
 
         @Builder.Default
+        @DecimalMin(value = "0", message = "Discount percent cannot be negative")
+        @DecimalMax(value = "100", message = "Discount percent cannot exceed 100")
         private BigDecimal discountPercent = BigDecimal.ZERO;
     }
 

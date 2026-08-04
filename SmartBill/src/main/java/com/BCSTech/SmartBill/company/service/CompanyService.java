@@ -28,6 +28,7 @@ public class CompanyService {
                 .defaultCurrency("INR")
                 .invoicePrefix("INV-")
                 .invoiceSequence(1)
+                .purchaseSequence(1)
                 .financialYearStartMonth(4)   // April — Indian financial year
                 .subscriptionPlan(SubscriptionPlan.FREE)
                 .createdByUserId(userId)

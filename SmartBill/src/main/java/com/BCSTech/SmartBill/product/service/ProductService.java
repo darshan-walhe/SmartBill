@@ -1,6 +1,8 @@
 package com.BCSTech.SmartBill.product.service;
 
 import com.BCSTech.SmartBill.common.exception.AppException;
+import com.BCSTech.SmartBill.notification.model.NotificationType;
+import com.BCSTech.SmartBill.notification.service.NotificationService;
 import com.BCSTech.SmartBill.product.dto.ProductDTOs;
 import com.BCSTech.SmartBill.product.dto.ProductDTOs.*;
 import com.BCSTech.SmartBill.product.model.Product;
@@ -10,6 +12,11 @@ import com.BCSTech.SmartBill.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,6 +31,8 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final MongoTemplate mongoTemplate;
+    private final NotificationService notificationService;
     private final ProductCategoryRepository categoryRepository;
 
     // ══════════════════════════════════════════════════════════════
@@ -217,21 +226,47 @@ public class ProductService {
     }
 
     // ── Called by InventoryService to adjust stock ────────────────────────────
+    // Atomic at the DB level: the stock-sufficiency check and the decrement
+    // happen as a single findAndModify document operation. The previous
+    // implementation did read -> check -> save, which meant two concurrent
+    // invoices for the last unit of stock could both read currentStock=1,
+    // both pass the check, and both succeed (overselling).
     public void adjustStock(String productId, String companyId, int delta) {
-        Product product = getProductOrThrow(productId, companyId);
-        int newStock = product.getCurrentStock() + delta;
-        if (newStock < 0) {
-            throw AppException.badRequest(
-                    "Insufficient stock for '" + product.getName() +
-                            "'. Available: " + product.getCurrentStock() + ", Required: " + Math.abs(delta));
+        Query query = new Query(Criteria.where("id").is(productId).and("companyId").is(companyId));
+        if (delta < 0) {
+            // Only allow the decrement to go through if enough stock is present —
+            // enforced as part of the same atomic operation, not a separate read.
+            query.addCriteria(Criteria.where("currentStock").gte(-delta));
         }
-        product.setCurrentStock(newStock);
-        productRepository.save(product);
+        Update update = new Update().inc("currentStock", delta);
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
 
-        // Log low stock warning
-        if (newStock <= product.getLowStockThreshold()) {
+        Product updated = mongoTemplate.findAndModify(query, update, options, Product.class);
+
+        if (updated == null) {
+            // Either the product doesn't exist, or (for stock-out movements)
+            // there wasn't enough stock — disambiguate with a plain lookup.
+            Product existing = getProductOrThrow(productId, companyId);
+            throw AppException.badRequest(
+                    "Insufficient stock for '" + existing.getName() +
+                            "'. Available: " + existing.getCurrentStock() + ", Required: " + Math.abs(delta));
+        }
+
+        // Low stock warning — log + persist a notification so it shows up in the UI
+        if (updated.getCurrentStock() <= updated.getLowStockThreshold()) {
             log.warn("LOW STOCK: {} (SKU: {}) — {} units remaining (threshold: {})",
-                    product.getName(), product.getSku(), newStock, product.getLowStockThreshold());
+                    updated.getName(), updated.getSku(), updated.getCurrentStock(), updated.getLowStockThreshold());
+
+            NotificationType type = updated.getCurrentStock() <= 0
+                    ? NotificationType.OUT_OF_STOCK : NotificationType.LOW_STOCK;
+            String title = type == NotificationType.OUT_OF_STOCK
+                    ? "Out of stock: " + updated.getName()
+                    : "Low stock: " + updated.getName();
+
+            notificationService.notifyCompany(companyId, type, title,
+                    updated.getName() + " (SKU: " + updated.getSku() + ") has "
+                            + updated.getCurrentStock() + " units remaining.",
+                    "PRODUCT", updated.getId());
         }
     }
 

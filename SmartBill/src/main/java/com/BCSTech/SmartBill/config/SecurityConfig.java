@@ -1,5 +1,6 @@
 package com.BCSTech.SmartBill.config;
 
+import com.BCSTech.SmartBill.common.ratelimit.RateLimitFilter;
 import com.BCSTech.SmartBill.common.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -32,6 +33,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
     // Public endpoints — no token needed
@@ -60,6 +62,7 @@ public class SecurityConfig {
                 )
 
                 // Plug in our JWT filter before Spring's default username/password filter
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // Disable the default form login page — this is the fix you need

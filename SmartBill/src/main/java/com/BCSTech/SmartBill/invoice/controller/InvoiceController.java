@@ -30,7 +30,7 @@ public class InvoiceController {
             @CurrentUser CurrentUser.AuthUser authUser) {
 
         InvoiceResponse response = invoiceService.create(
-                authUser.getCompanyId(), authUser.getUserId(), request);
+                authUser.getCompanyId(), authUser.getUserId(), authUser.getRole(), request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

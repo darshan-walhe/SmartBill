@@ -1,5 +1,12 @@
 server:
   port: 8080
+  error:
+    # Explicit, not relying on Spring Boot's defaults staying unchanged —
+    # never include exception details/stack traces in error responses.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
 
 spring:
   application:
@@ -32,9 +39,24 @@ app:
   otp:
     expiry-minutes: 10
     length: 6
+    # DEV ONLY — when true, the actual OTP is written to logs so you can test
+    # without a real SMS gateway. Must be false (or unset) everywhere else —
+    # anyone with log access could otherwise log in as any user.
+    log-plaintext: ${OTP_LOG_PLAINTEXT:false}
 
   google:
     client-id: ${GOOGLE_CLIENT_ID:your-google-client-id.apps.googleusercontent.com}
+
+  # First SUPER_ADMIN account, created once on startup by SuperAdminBootstrap
+  # if no SUPER_ADMIN exists yet. Leave both unset to skip bootstrap entirely
+  # (e.g. on every startup after the first). Unset SUPER_ADMIN_PASSWORD from
+  # your environment once the account has been created — it's only read
+  # when no SUPER_ADMIN exists yet, so leaving it set afterward does nothing
+  # but does needlessly keep a plaintext credential in your env.
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:}
+    password: ${SUPER_ADMIN_PASSWORD:}
+    name: ${SUPER_ADMIN_NAME:Platform Super Admin}
 
   cors:
     allowed-origins:
