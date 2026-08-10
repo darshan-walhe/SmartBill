@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../context/AuthContext";
 import { companyApi } from "../api/company";
+import { notificationsApi } from "../api/notifications";
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -18,6 +20,7 @@ function initialsOf(name: string | undefined): string {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { session, logout } = useAuth();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Real company name in the title bar, not the mockup's hardcoded
@@ -26,6 +29,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     queryKey: ["company"],
     queryFn: companyApi.get,
     staleTime: 5 * 60_000,
+  });
+
+  const { data: unread } = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: notificationsApi.unreadCount,
+    refetchInterval: 60_000, // poll every minute — no websocket/push exists here
   });
 
   return (
@@ -42,27 +51,19 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           {company?.name ?? "SmartBill"}
         </h1>
       </div>
-      {/* Search Bar */}
-      <div className="flex items-center w-1/3">
-        <div className="relative w-full max-w-sm">
-          <span
-            className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-          <input
-            className="w-full bg-surface-container text-body-md font-body-md pl-10 pr-4 py-2 rounded-full border-none focus:ring-2 focus:ring-primary/20 transition-all"
-            placeholder="Search Global..." type="text" />
-        </div>
-      </div>
 
       <div className="flex items-center gap-3 md:gap-6">
-        {/* Static badge count for now — wired to GET /api/notifications/unread-count in Phase 7 */}
         <button
+          onClick={() => navigate("/notifications")}
           className="relative p-2 hover:bg-surface-container-low rounded-full transition-colors group"
           aria-label="Notifications"
         >
           <Icon name="notifications" className="text-on-surface-variant group-hover:text-primary" />
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-error text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-surface">
-            3
-          </span>
+          {!!unread?.unreadCount && (
+            <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-0.5 bg-error text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-surface">
+              {unread.unreadCount > 99 ? "99+" : unread.unreadCount}
+            </span>
+          )}
         </button>
 
         <div className="relative">

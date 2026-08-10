@@ -99,6 +99,22 @@
   --font-sans: "Inter", system-ui, sans-serif;
 }
 
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #purchase-print-area,
+  #purchase-print-area * {
+    visibility: visible;
+  }
+  #purchase-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
+
 @layer base {
   body {
     @apply bg-background text-on-surface font-sans antialiased;
