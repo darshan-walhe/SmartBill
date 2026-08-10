@@ -26,6 +26,7 @@ export function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CustomerResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomerSummary | null>(null);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["customers", debouncedSearch, page],
@@ -48,9 +49,16 @@ export function CustomersPage() {
   });
 
   async function openEdit(summary: CustomerSummary) {
-    const full = await customersApi.getById(summary.id);
-    setEditTarget(full);
-    setFormOpen(true);
+    setLoadingEditId(summary.id);
+    try {
+      const full = await customersApi.getById(summary.id);
+      setEditTarget(full);
+      setFormOpen(true);
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Failed to load customer", "danger");
+    } finally {
+      setLoadingEditId(null);
+    }
   }
 
   function openCreate() {
@@ -109,10 +117,11 @@ export function CustomersPage() {
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => openEdit(c)}
-            className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+            disabled={loadingEditId === c.id}
+            className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait"
             aria-label={`Edit ${c.name}`}
           >
-            <Icon name="edit" size={20} />
+            <Icon name={loadingEditId === c.id ? "sync" : "edit"} size={20} className={loadingEditId === c.id ? "animate-spin" : ""} />
           </button>
           <button
             onClick={() => setDeleteTarget(c)}

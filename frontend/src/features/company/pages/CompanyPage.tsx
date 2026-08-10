@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormRegister, type FieldErrors } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { companyApi, type CompanyUpdateRequest } from "../../../api/company";
 import { useAuth } from "../../../context/AuthContext";
@@ -12,12 +12,101 @@ type Tab = (typeof tabs)[number];
 const inputClass =
   "w-full border border-outline-variant rounded-lg px-4 py-2.5 text-body-md focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none disabled:bg-slate-50 disabled:text-on-surface-variant disabled:cursor-not-allowed";
 
+const errorInputClass =
+  "w-full border border-danger rounded-lg px-4 py-2.5 text-body-md focus:border-danger focus:ring-2 focus:ring-danger/10 transition-all outline-none disabled:bg-slate-50 disabled:text-on-surface-variant disabled:cursor-not-allowed";
+
 const planLabel: Record<string, string> = {
   FREE: "Free",
   BASIC: "Basic",
   PRO: "Pro",
   ENTERPRISE: "Enterprise",
 };
+
+type FieldProps = {
+  label: string;
+  name: keyof CompanyUpdateRequest;
+  register: UseFormRegister<CompanyUpdateRequest>;
+  errors: FieldErrors<CompanyUpdateRequest>;
+  disabled?: boolean;
+  type?: string;
+  mono?: boolean;
+  required?: boolean;
+  valueAsNumber?: boolean;
+  min?: number;
+  max?: number;
+  hint?: string;
+};
+
+function Field({
+  label,
+  name,
+  register,
+  errors,
+  disabled,
+  type = "text",
+  mono,
+  required,
+  valueAsNumber,
+  min,
+  max,
+  hint,
+}: FieldProps) {
+  const id = `field-${name}`;
+  const error = errors[name];
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-label-md text-on-surface-variant">
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        min={min}
+        max={max}
+        className={`${error ? errorInputClass : inputClass} ${mono ? "font-mono tabular-nums" : ""}`}
+        disabled={disabled}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
+        {...register(name, { required, valueAsNumber })}
+      />
+      {hint && !error && <p className="text-[10px] text-on-surface-variant italic mt-1">{hint}</p>}
+      {error && (
+        <p id={`${id}-error`} className="text-label-sm text-danger mt-1">
+          {label} is required
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TextAreaField({
+  label,
+  name,
+  register,
+  disabled,
+}: {
+  label: string;
+  name: keyof CompanyUpdateRequest;
+  register: UseFormRegister<CompanyUpdateRequest>;
+  disabled?: boolean;
+}) {
+  const id = `field-${name}`;
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-label-md text-on-surface-variant">
+        {label}
+      </label>
+      <textarea
+        id={id}
+        rows={2}
+        className={`${inputClass} resize-none`}
+        disabled={disabled}
+        {...register(name)}
+      />
+    </div>
+  );
+}
 
 export function CompanyPage() {
   const { session } = useAuth();
@@ -35,7 +124,7 @@ export function CompanyPage() {
     register,
     handleSubmit,
     reset,
-    formState: { isDirty },
+    formState: { isDirty, errors },
   } = useForm<CompanyUpdateRequest>();
 
   useEffect(() => {
@@ -45,8 +134,8 @@ export function CompanyPage() {
   const mutation = useMutation({
     mutationFn: companyApi.update,
     onSuccess: (updated) => {
+      // setQueryData drives the useEffect above, which calls reset(updated) for us.
       queryClient.setQueryData(["company"], updated);
-      reset(updated);
       show("Company profile updated", "success");
     },
     onError: (err: Error) => show(err.message, "danger"),
@@ -65,7 +154,7 @@ export function CompanyPage() {
         <div className="flex items-center gap-3">
           <h1 className="text-headline-lg text-on-surface">Company Settings</h1>
           <span className="px-2 py-0.5 bg-slate-100 text-on-surface-variant text-[10px] font-bold rounded border border-outline-variant tracking-wider uppercase">
-            {session?.role.replace("_", " ")}
+            {session?.role.replace(/_/g, " ")}
           </span>
         </div>
         <nav className="flex gap-6 border-b border-outline-variant/30 w-full md:w-auto overflow-x-auto">
@@ -74,7 +163,7 @@ export function CompanyPage() {
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`whitespace-nowrap text-body-md pb-2 transition-colors ${
+              className={`whitespace-nowrap text-body-md pb-2 transition-colors cursor-pointer  ${
                 tab === t
                   ? "text-primary font-bold border-b-2 border-primary"
                   : "text-on-surface-variant hover:text-primary"
@@ -89,9 +178,7 @@ export function CompanyPage() {
       {tab !== "General Details" ? (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
           <Icon name="construction" className="text-on-surface-variant mx-auto mb-3" size={32} />
-          <p className="text-body-md text-on-surface-variant">
-            {t_label(tab)} isn't wired up in this phase yet.
-          </p>
+          <p className="text-body-md text-on-surface-variant">{tab} isn't wired up in this phase yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -102,29 +189,21 @@ export function CompanyPage() {
               <h2 className="text-lg font-semibold text-on-surface">Business Details</h2>
             </div>
             <div className="space-y-5">
-              <div className="flex flex-col gap-1">
-                <label className="text-label-md text-on-surface-variant">Business Name</label>
-                <input className={inputClass} disabled={!canEdit} {...register("name", { required: true })} />
+              <Field
+                label="Business Name"
+                name="name"
+                register={register}
+                errors={errors}
+                disabled={!canEdit}
+                required
+              />
+              <div className="grid grid-cols-2 gap-5">
+                <Field label="GST Number" name="gstNumber" register={register} errors={errors} disabled={!canEdit} mono />
+                <Field label="PAN Number" name="panNumber" register={register} errors={errors} disabled={!canEdit} mono />
               </div>
               <div className="grid grid-cols-2 gap-5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">GST Number</label>
-                  <input className={`${inputClass} font-mono tabular-nums`} disabled={!canEdit} {...register("gstNumber")} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">PAN Number</label>
-                  <input className={`${inputClass} font-mono tabular-nums`} disabled={!canEdit} {...register("panNumber")} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Contact Email</label>
-                  <input type="email" className={inputClass} disabled={!canEdit} {...register("email")} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Mobile Number</label>
-                  <input className={`${inputClass} font-mono tabular-nums`} disabled={!canEdit} {...register("mobile")} />
-                </div>
+                <Field label="Contact Email" name="email" type="email" register={register} errors={errors} disabled={!canEdit} />
+                <Field label="Mobile Number" name="mobile" register={register} errors={errors} disabled={!canEdit} mono />
               </div>
             </div>
           </div>
@@ -136,29 +215,14 @@ export function CompanyPage() {
               <h2 className="text-lg font-semibold text-on-surface">Registered Address</h2>
             </div>
             <div className="space-y-5">
-              <div className="flex flex-col gap-1">
-                <label className="text-label-md text-on-surface-variant">Full Address</label>
-                <textarea rows={2} className={`${inputClass} resize-none`} disabled={!canEdit} {...register("address")} />
+              <TextAreaField label="Full Address" name="address" register={register} disabled={!canEdit} />
+              <div className="grid grid-cols-2 gap-5">
+                <Field label="City" name="city" register={register} errors={errors} disabled={!canEdit} />
+                <Field label="State" name="state" register={register} errors={errors} disabled={!canEdit} />
               </div>
               <div className="grid grid-cols-2 gap-5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">City</label>
-                  <input className={inputClass} disabled={!canEdit} {...register("city")} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">State</label>
-                  <input className={inputClass} disabled={!canEdit} {...register("state")} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Pincode</label>
-                  <input className={`${inputClass} font-mono tabular-nums`} disabled={!canEdit} {...register("pincode")} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Country</label>
-                  <input className={inputClass} disabled={!canEdit} {...register("country")} />
-                </div>
+                <Field label="Pincode" name="pincode" register={register} errors={errors} disabled={!canEdit} mono />
+                <Field label="Country" name="country" register={register} errors={errors} disabled={!canEdit} />
               </div>
             </div>
           </div>
@@ -170,29 +234,28 @@ export function CompanyPage() {
               <h2 className="text-lg font-semibold text-on-surface">Invoicing Preferences</h2>
             </div>
             <div className="space-y-5">
-              <div className="flex flex-col gap-1">
-                <label className="text-label-md text-on-surface-variant">Invoice Prefix</label>
-                <input className={`${inputClass} font-mono tabular-nums`} disabled={!canEdit} {...register("invoicePrefix")} />
-                <p className="text-[10px] text-on-surface-variant italic mt-1">
-                  Example: {company?.invoicePrefix ?? "INV-"}{String(company?.invoiceSequence ?? 1).padStart(4, "0")}
-                </p>
-              </div>
+              <Field
+                label="Invoice Prefix"
+                name="invoicePrefix"
+                register={register}
+                errors={errors}
+                disabled={!canEdit}
+                mono
+                hint={`Example: ${company?.invoicePrefix ?? "INV-"}${String(company?.invoiceSequence ?? 1).padStart(4, "0")}`}
+              />
               <div className="grid grid-cols-2 gap-5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Financial Year Start Month</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={12}
-                    className={inputClass}
-                    disabled={!canEdit}
-                    {...register("financialYearStartMonth", { valueAsNumber: true })}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-label-md text-on-surface-variant">Default Currency</label>
-                  <input className={inputClass} disabled={!canEdit} {...register("defaultCurrency")} />
-                </div>
+                <Field
+                  label="Financial Year Start Month"
+                  name="financialYearStartMonth"
+                  type="number"
+                  min={1}
+                  max={12}
+                  register={register}
+                  errors={errors}
+                  disabled={!canEdit}
+                  valueAsNumber
+                />
+                <Field label="Default Currency" name="defaultCurrency" register={register} errors={errors} disabled={!canEdit} />
               </div>
             </div>
           </div>
@@ -262,8 +325,4 @@ export function CompanyPage() {
       )}
     </form>
   );
-}
-
-function t_label(tab: Tab): string {
-  return tab;
 }

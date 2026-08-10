@@ -11,6 +11,14 @@ import { SuppliersPage } from "./features/suppliers/pages/SuppliersPage";
 import { ProductsPage } from "./features/products/pages/ProductsPage";
 import { InventoryLedgerPage } from "./features/inventory/pages/InventoryLedgerPage";
 import { InvoicesListPage } from "./features/invoices/pages/InvoicesListPage";
+import { InvoiceBuilderPage } from "./features/invoices/pages/InvoiceBuilderPage";
+import { InvoiceDetailPage } from "./features/invoices/pages/InvoiceDetailPage";
+import { PurchasesListPage } from "./features/purchases/pages/PurchasesListPage";
+import { PurchaseBuilderPage } from "./features/purchases/pages/PurchaseBuilderPage";
+import { PurchaseDetailPage } from "./features/purchases/pages/PurchaseDetailPage";
+import { GstReportsPage } from "./features/gst/pages/GstReportsPage";
+import { AccountsPage } from "./features/accounts/pages/AccountsPage";
+import { NotificationsPage } from "./features/notifications/pages/NotificationsPage";
 import { AdminShell } from "./features/admin/layout/AdminShell";
 import { TenantsPage } from "./features/admin/pages/TenantsPage";
 import { PlatformAuditLogPage } from "./features/admin/pages/PlatformAuditLogPage";
@@ -40,13 +48,15 @@ export default function App() {
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/inventory" element={<InventoryLedgerPage />} />
         <Route path="/invoices" element={<InvoicesListPage />} />
-        <Route path="/invoices/new" element={<ComingSoon title="Create Invoice" phase="Phase 4 (next)" />} />
-        <Route path="/invoices/:id" element={<ComingSoon title="Invoice Detail" phase="Phase 4 (next)" />} />
-        <Route path="/purchases" element={<ComingSoon title="Purchases" phase="Phase 5" />} />
-        <Route path="/gst" element={<ComingSoon title="GST Reports" phase="Phase 6" />} />
-        <Route path="/accounts" element={<ComingSoon title="Journal" phase="Phase 6" />} />
+        <Route path="/invoices/new" element={<InvoiceBuilderPage />} />
+        <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+        <Route path="/purchases" element={<PurchasesListPage />} />
+        <Route path="/purchases/new" element={<PurchaseBuilderPage />} />
+        <Route path="/purchases/:id" element={<PurchaseDetailPage />} />
+        <Route path="/gst" element={<GstReportsPage />} />
+        <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/company" element={<CompanyPage />} />
-        <Route path="/notifications" element={<ComingSoon title="Notifications" phase="Phase 7" />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
 
       {/* ADMIN/MANAGER only — matches backend's hasAnyRole('ADMIN','MANAGER') on GET /api/users */}

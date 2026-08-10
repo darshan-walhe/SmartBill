@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormRegister, type FieldErrors, type Path } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { customersApi, type CustomerResponse, type CustomerSaveRequest } from "../../../api/customers";
 import { Modal } from "../../../components/ui/Modal";
@@ -15,8 +15,92 @@ interface CustomerFormModalProps {
 const inputClass =
   "w-full px-4 py-2 border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-body-md";
 
+const errorInputClass =
+  "w-full px-4 py-2 border border-error rounded-lg focus:ring-2 focus:ring-error/20 focus:border-error outline-none transition-all text-body-md";
+
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const MOBILE_PATTERN = /^[6-9]\d{9}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type FieldProps = {
+  label: string;
+  name: Path<CustomerSaveRequest>;
+  register: UseFormRegister<CustomerSaveRequest>;
+  errors: FieldErrors<CustomerSaveRequest>;
+  required?: string;
+  pattern?: { value: RegExp; message: string };
+  type?: string;
+  placeholder?: string;
+  maxLength?: number;
+  step?: string;
+  uppercase?: boolean;
+  mono?: boolean;
+  disabled?: boolean;
+  valueAsNumber?: boolean;
+  hint?: string;
+};
+
+function Field({
+  label,
+  name,
+  register,
+  errors,
+  required,
+  pattern,
+  type = "text",
+  placeholder,
+  maxLength,
+  step,
+  uppercase,
+  mono,
+  disabled,
+  valueAsNumber,
+  hint,
+}: FieldProps) {
+  const id = `field-${name}`;
+  const error = errors[name];
+  const { onChange, ...rest } = register(name, {
+    required,
+    pattern,
+    valueAsNumber,
+    // Force GSTIN (or any `uppercase` field) to uppercase as the user types,
+    // rather than only styling it visually — the raw value must match the regex.
+    ...(uppercase
+      ? {
+          onChange: (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          },
+        }
+      : {}),
+  });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-label-md text-on-surface-variant">
+        {label} {required && <span className="text-error">*</span>}
+      </label>
+      <input
+        id={id}
+        type={type}
+        step={step}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`${error ? errorInputClass : inputClass} ${uppercase ? "uppercase" : ""} ${mono ? "font-mono" : ""}`}
+        onChange={onChange}
+        {...rest}
+      />
+      {hint && !error && <p className="text-[10px] text-on-surface-variant">{hint}</p>}
+      {error && (
+        <span id={`${id}-error`} className="text-[10px] text-error">
+          {error.message as string}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormModalProps) {
   const { show } = useToast();
@@ -64,55 +148,55 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
     >
       <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
         <section className="space-y-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-label-md text-on-surface-variant">
-              Business / Customer Name <span className="text-error">*</span>
-            </label>
-            <input
-              className={inputClass}
-              placeholder="e.g. Acme Corporation"
-              {...register("name", { required: "Name is required" })}
-            />
-            {errors.name && <span className="text-[10px] text-error">{errors.name.message}</span>}
-          </div>
+          <Field
+            label="Business / Customer Name"
+            name="name"
+            register={register}
+            errors={errors}
+            required="Name is required"
+            placeholder="e.g. Acme Corporation"
+          />
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Mobile Number</label>
-              <input
-                type="tel"
-                className={inputClass}
-                placeholder="10-digit number"
-                {...register("mobile", {
-                  pattern: { value: MOBILE_PATTERN, message: "Enter a valid 10-digit mobile number" },
-                })}
-              />
-              {errors.mobile && <span className="text-[10px] text-error">{errors.mobile.message}</span>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Email Address</label>
-              <input type="email" className={inputClass} placeholder="contact@business.com" {...register("email")} />
-            </div>
+            <Field
+              label="Mobile Number"
+              name="mobile"
+              type="tel"
+              register={register}
+              errors={errors}
+              placeholder="10-digit number"
+              pattern={{ value: MOBILE_PATTERN, message: "Enter a valid 10-digit mobile number" }}
+            />
+            <Field
+              label="Email Address"
+              name="email"
+              type="email"
+              register={register}
+              errors={errors}
+              placeholder="contact@business.com"
+              pattern={{ value: EMAIL_PATTERN, message: "Enter a valid email address" }}
+            />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-label-md text-on-surface-variant">GSTIN (15 characters)</label>
-            <input
-              className={`${inputClass} uppercase`}
-              maxLength={15}
-              placeholder="27XXXXX0000X0Z0"
-              {...register("gstin", {
-                pattern: { value: GSTIN_PATTERN, message: "Enter a valid 15-character GSTIN" },
-              })}
-            />
-            {errors.gstin && <span className="text-[10px] text-error">{errors.gstin.message}</span>}
-          </div>
+          <Field
+            label="GSTIN (15 characters)"
+            name="gstin"
+            register={register}
+            errors={errors}
+            maxLength={15}
+            placeholder="27XXXXX0000X0Z0"
+            uppercase
+            pattern={{ value: GSTIN_PATTERN, message: "Enter a valid 15-character GSTIN" }}
+          />
         </section>
 
         <section className="space-y-4">
           <div className="flex flex-col gap-1">
-            <label className="text-label-md text-on-surface-variant">Street Address</label>
+            <label htmlFor="field-address" className="text-label-md text-on-surface-variant">
+              Street Address
+            </label>
             <textarea
+              id="field-address"
               rows={2}
               className={`${inputClass} resize-none`}
               placeholder="Suite 402, Business Park..."
@@ -120,24 +204,12 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">City</label>
-              <input className={inputClass} placeholder="Mumbai" {...register("city")} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">State</label>
-              <input className={inputClass} placeholder="Maharashtra" {...register("state")} />
-            </div>
+            <Field label="City" name="city" register={register} errors={errors} placeholder="Mumbai" />
+            <Field label="State" name="state" register={register} errors={errors} placeholder="Maharashtra" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Country</label>
-              <input className={inputClass} placeholder="India" {...register("country")} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Pincode</label>
-              <input className={inputClass} maxLength={6} placeholder="400001" {...register("pincode")} />
-            </div>
+            <Field label="Country" name="country" register={register} errors={errors} placeholder="India" />
+            <Field label="Pincode" name="pincode" register={register} errors={errors} maxLength={6} placeholder="400001" mono />
           </div>
         </section>
 
@@ -146,32 +218,28 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
             Financial Profile
           </h4>
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Credit Limit (₹)</label>
-              <input
-                type="number"
-                step="0.01"
-                className={inputClass}
-                placeholder="0.00"
-                {...register("creditLimit", { valueAsNumber: true })}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-label-md text-on-surface-variant">Opening Balance (₹)</label>
-              <input
-                type="number"
-                step="0.01"
-                className={inputClass}
-                placeholder="0.00"
-                disabled={isEdit}
-                {...register("openingBalance", { valueAsNumber: true })}
-              />
-              {isEdit && (
-                <p className="text-[10px] text-on-surface-variant">
-                  Opening balance is locked after creation — it feeds the running current balance.
-                </p>
-              )}
-            </div>
+            <Field
+              label="Credit Limit (₹)"
+              name="creditLimit"
+              type="number"
+              step="0.01"
+              register={register}
+              errors={errors}
+              placeholder="0.00"
+              valueAsNumber
+            />
+            <Field
+              label="Opening Balance (₹)"
+              name="openingBalance"
+              type="number"
+              step="0.01"
+              register={register}
+              errors={errors}
+              placeholder="0.00"
+              disabled={isEdit}
+              valueAsNumber
+              hint={isEdit ? "Opening balance is locked after creation — it feeds the running current balance." : undefined}
+            />
           </div>
         </section>
       </form>
